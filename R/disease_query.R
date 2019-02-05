@@ -10,10 +10,10 @@ if (length(args)>0)
 {
   (qry <- args[1])
 } else {
-  qry <- "%diabetes%"
+  qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
 }
 
-writeLines(sprintf("QUERY: WHERE disease.name LIKE '%s'", qry))
+writeLines(sprintf("QUERY: WHERE disease.name REGEXP '%s'", qry))
 
 dbcon <- dbConnect(MySQL(), host="juniper.health.unm.edu", dbname="tcrd")
 sql <- sprintf("SELECT
@@ -26,15 +26,19 @@ FROM
 	target t, protein p, t2tc, disease d
 WHERE
 	d.target_id = t.id AND t2tc.target_id = t.id AND t2tc.protein_id = p.id
-	AND d.name LIKE '%s'", qry)
+	AND d.name REGEXP '%s'", qry)
 #
 tcrd <- dbGetQuery(dbcon,sql)
 dbDisconnect(dbcon)
 rm(dbcon)
 #
 setDT(tcrd)
-setorder(tcrd, -zscore, -conf)
-
+#
+dcounts <- tcrd[, .(N = .N), by = .(name = name)]
+setorder(dcounts, -N)
+writeLines(sprintf("Total unique disease terms: %d", nrow(dcounts)))
+writeLines(sprintf("%d. %d (%.1f%%) %s", 1:nrow(dcounts), dcounts$N, 100*dcounts$N/nrow(tcrd), dcounts$name))
+#
 #writeLines(sprintf("Evidence source: %s [N = %d]", names(table(tcrd$dtype)), table(tcrd$dtype)))
 writeLines(sprintf("Evidence sources and disease-gene association counts:"))
 for (src in unique(tcrd$dtype)) {
