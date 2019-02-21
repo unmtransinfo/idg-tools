@@ -3,19 +3,25 @@
 library(readr)
 library(data.table, quietly = T)
 library(RMySQL, quietly = T)
-#library(plotly, quietly = T)
+
+DBNAME <- "tcrd"
+DBHOST <- "juniper.health.unm.edu"
 
 args <- commandArgs(trailingOnly=TRUE)
-if (length(args)>0)
-{
+if (interactive()) {
+  qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
+} else if (length(args)>0) {
   (qry <- args[1])
 } else {
-  qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
+  message("ERROR: syntax: PROG DISEASE_QUERY_REGEX")
+  quit()
 }
 
+print(Sys.Date())
+writeLines(sprintf("DBHOST: %s; DBNAME: %s", DBHOST, DBNAME))
 writeLines(sprintf("QUERY: WHERE disease.name REGEXP '%s'", qry))
 
-dbcon <- dbConnect(MySQL(), host="juniper.health.unm.edu", dbname="tcrd")
+dbcon <- dbConnect(MySQL(), host=DBHOST, dbname=DBNAME)
 sql <- sprintf("SELECT
 	d.did, d.name, d.dtype, d.zscore, d.evidence, d.conf,
 	d.reference, d.drug_name, d.log2foldchange, d.pvalue, d.score, d.source,
@@ -39,7 +45,6 @@ setorder(dcounts, -N)
 writeLines(sprintf("Total unique disease terms: %d", nrow(dcounts)))
 writeLines(sprintf("%d. %d (%.1f%%) %s", 1:nrow(dcounts), dcounts$N, 100*dcounts$N/nrow(tcrd), dcounts$name))
 #
-#writeLines(sprintf("Evidence source: %s [N = %d]", names(table(tcrd$dtype)), table(tcrd$dtype)))
 writeLines(sprintf("Evidence sources and disease-gene association counts:"))
 for (src in unique(tcrd$dtype)) {
   writeLines(sprintf("%44s: associations: %4d; genes: %4d", src, sum(tcrd$dtype==src), length(unique(tcrd$geneid[tcrd$dtype==src]))))

@@ -1,0 +1,9 @@
+alzheimer
+bipolar
+(^diabetes.*type 2|^type 2.*diabetes)
+(breast.*cancer|cancer.*breast)
+(pancrea.*cancer|cancer.*pancrea|carcinoma.*pancrea|tumor.*pancrea)
+(prostat.*cancer|cancer.*prostat|carcinoma.*prostat|tumor.*prostat)
+(colitis|crohn)
+(rheumat.*arthritis)
+(^depressive|depression|depressive disorder)
