@@ -1,52 +1,26 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 	TCRD db client utility (see also REST API client)
-
 	In general, return data as lists and dicts, readily convertible to JSON.
-
-	Jeremy Yang
-	14 Aug 2015
+	See https://dev.mysql.com/doc/connector-python/en/
+	regarding mysql-connector-python package.
 '''
-import os,sys,getopt,re,time,types,codecs
+import os,sys,argparse,re,time,types
 import json
-
-try:
-  import pymysql as mysql
-except Exception, e:
-  print >>sys.stderr, str(e)
-  try:
-    import MySQLdb as mysql
-  except Exception, e:
-    print >>sys.stderr, str(e)
-    sys.exit(1)
+import mysql.connector as mysql
 
 PROG=os.path.basename(sys.argv[0])
 
 DBHOST='juniper.health.unm.edu'
-#DBHOST='habanero.health.unm.edu'
 DBNAME='tcrd'
-#DBNAME='tcrdev'
-DBUSR='jjyang'
-DBPW='assword'
+DBUSR=os.environ['USER']
 
-
-TDL={	0:'Tdark',
-	1:'Tbio',
-	2:'Tchem',
-	4:'Tclin'
-	}
+TDLS=['Tdark', 'Tbio', 'Tchem', 'Tclin']
 
 #############################################################################
-def Connect(dbhost,dbname,dbusr,dbpw):
-  #dsn='%s:%s:%s:%s'%(dbhost,dbname,dbusr,dbpw)
-  #db=mysql.connect(dsn=dsn)
-  db=mysql.connect(host=dbhost,user=dbusr,passwd=dbpw,db=dbname)
-  return db
-
-#############################################################################
-def ListTables(dbname,dbcon):
+def ListTables(dbcon):
   cur=dbcon.cursor()
-  cur.execute('SHOW TABLES ;')
+  cur.execute('SHOW TABLES')
   rows=cur.fetchall()
   tables=[]
   for row in rows:
@@ -55,19 +29,19 @@ def ListTables(dbname,dbcon):
   return tables
 
 #############################################################################
-def Info(dbname,dbcon):
-  cur=dbcon.cursor(mysql.cursors.DictCursor)
-  cur.execute('SELECT * FROM dbinfo ;')
+def Info(dbcon):
+  cur=dbcon.cursor(dictionary=True)
+  cur.execute('SELECT * FROM dbinfo')
   row=cur.fetchone()
   return row
 
 #############################################################################
-def Describe(dbname,dbcon):
+def Describe(dbcon):
   cur=dbcon.cursor()
   outtxt=''
-  for table in ListTables(dbname,dbcon):
+  for table in ListTables(dbcon):
     outtxt+=('%s:\n'%table)
-    cur.execute('DESCRIBE '+table+';')
+    cur.execute('DESCRIBE '+table)
     row=cur.fetchone()
     cols=[]
     while row:
@@ -78,18 +52,18 @@ def Describe(dbname,dbcon):
   return outtxt
 
 #############################################################################
-def Counts(dbname,dbcon):
-  tables=ListTables(dbname,dbcon)
+def Counts(dbcon):
+  tables=ListTables(dbcon)
   cur=dbcon.cursor()
   outtxt=''
   for table in tables:
-    cur.execute('SELECT count(*) FROM '+table+';')
+    cur.execute('SELECT count(*) FROM '+table)
     row=cur.fetchone()
     outtxt+=('%18s: %8d rows\n'%(table,row[0]))
   return outtxt
 
 #############################################################################
-def AttributeCounts(dbname,dbcon):
+def AttributeCounts(dbcon):
   cur=dbcon.cursor()
   sql='SELECT ga.type, COUNT(ga.id) FROM gene_attribute ga GROUP BY ga.type'
   cur.execute(sql)
@@ -105,7 +79,7 @@ def AttributeCounts(dbname,dbcon):
   return outtxt
 
 #############################################################################
-def XrefCounts(dbname,dbcon):
+def XrefCounts(dbcon):
   '''Synonyms, aliases, and Xrefs.'''
   cur=dbcon.cursor()
   outtxt=''
@@ -133,14 +107,14 @@ def XrefCounts(dbname,dbcon):
   return outtxt
 
 #############################################################################
-def TDLCounts(dbname,dbcon):
+def TDLCounts(dbcon):
   cur=dbcon.cursor()
   sql='''\
 SELECT tdl,COUNT(id)
 FROM target
 WHERE tdl in (%(TDLS)s)
 GROUP BY tdl
-'''%{'TDLS':"'"+("','".join(TDL.values()))+"'"}
+'''%{'TDLS':"'"+("','".join(TDLS))+"'"}
   cur.execute(sql)
   rows=cur.fetchall()
   #outtxt=''
@@ -155,7 +129,7 @@ GROUP BY tdl
   return rdata
 
 #############################################################################
-def ListXreftypes(dbname,dbcon,verbose=0):
+def ListXreftypes(dbcon,verbose=0):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   sql='SELECT DISTINCT xtype FROM xref ORDER BY xtype'
   cur.execute(sql)
@@ -166,7 +140,7 @@ def ListXreftypes(dbname,dbcon,verbose=0):
   return xreftypes
 
 #############################################################################
-def ListXrefs(dbname,dbcon,qtype,fout,verbose):
+def ListXrefs(dbcon,qtype,fout,verbose):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   fout.write('"%s","target_id","protein_id"\n'%(qtype))
   cols=['value','target_id','protein_id']
@@ -185,77 +159,70 @@ WHERE xtype = '%(QTYPE)s'
     fout.write('"%s",%s,%s\n'%(row['value'],tid,pid))
     n_xref+=1
     row=cur.fetchone()
-  print >>sys.stderr, 'Xrefs count: %d'%(n_xref)
+  print('Xrefs count: %d'%(n_xref), file=sys.stderr)
 
 #############################################################################
-def ListTargets(dbname,dbcon,tdl,pfam,fout,verbose=0):
-  cur=dbcon.cursor(mysql.cursors.DictCursor)
-  cols=[
-	'target.id',
-	'target.fam',
-	'target.name',
-	'target.tdl',
-	'target.ttype',
-	'target.idg2',
-	'protein.chr',
-	'protein.description',
-	'protein.family',
-	'protein.geneid',
-	'protein.id',
-	'protein.name',
-	'protein.sym',
-	'protein.uniprot',
-	'protein.up_version',
-	'protein.stringid',
-	'protein.dtoid'
-	]
-  fout.write('%s\n'%(','.join(cols)))
+def ListTargets(dbcon,tdl,pfam,fout,verbose=0):
+  cur=dbcon.cursor(dictionary=True)
   sql='''
 SELECT
-	%(COLS)s
+	target.id AS "target_id",
+	target.name,
+	target.fam,
+	target.tdl,
+	target.idg2,
+	protein.id AS "protein_id",
+	protein.sym,
+	protein.family,
+	protein.geneid,
+	protein.uniprot,
+	protein.up_version,
+	protein.stringid,
+	protein.chr,
+	protein.description,
+	protein.dtoid
 FROM
 	target,
 	protein,
 	t2tc
-'''%{'COLS':(','.join(map(lambda s: '%s AS %s'%(s,s.replace('.','_')),cols)))}
+'''
   wheres=['protein.id = t2tc.protein_id','target.id = t2tc.target_id']
   if tdl:
-    wheres.append('target.tdl = \'%s\''%TDL[tdl])
+    wheres.append('target.tdl = \'%s\''%tdl)
   if pfam:
     wheres.append('target.fam = \'%s\''%pfam)
   if wheres:
     sql+=(' WHERE '+(' AND '.join(wheres)))
-  #print >>sys.stderr, 'DEBUG: sql = "%s"'%sql
-  
   cur.execute(sql)
   row=cur.fetchone()
   i_row=0;
   tids=set(); pids=set(); uniprots=set();
-  colnames=map(lambda s: s.replace('.','_'),cols)
   while row:
-    #print >>sys.stderr, 'DEBUG: %s'%str(row)
-    #break #DEBUG
     i_row+=1
-    if row.has_key('target_id'): tids.add(row['target_id'])
-    if row.has_key('protein_id'): pids.add(row['protein_id'])
-    if row.has_key('protein_uniprot'): uniprots.add(row['protein_uniprot'])
-    for j,tag in enumerate(colnames):
-      val = row[tag] if row.has_key(tag) else ''
-      fout.write('%s"%s"'%((',' if j>0 else ''),val))
-    fout.write('\n')
+    if i_row==1:
+      colnames=row.keys()
+      fout.write('\t'.join(colnames)+'\n')
+    if 'target_id' in row: tids.add(row['target_id'])
+    if 'protein_id' in row: pids.add(row['protein_id'])
+    if 'uniprot' in row: uniprots.add(row['uniprot'])
+#    for j,tag in enumerate(colnames):
+#      val = row[tag] if tag in row else ''
+#      fout.write('%s"%s"'%((',' if j>0 else ''),val))
+#    fout.write('\n')
+    fout.write('\t'.join([(str(row[tag]) if tag in row else '') for tag in colnames])+'\n')
     row=cur.fetchone()
-  print >>sys.stderr, 'TDL: %s'%(TDL[tdl] if tdl else 'all')
-  #print >>sys.stderr, 'rows: %d'%(i_row)
-  print >>sys.stderr, 'Target count: %d'%(len(tids))
-  print >>sys.stderr, 'Protein count: %d'%(len(pids))
-  print >>sys.stderr, 'Uniprot count: %d'%(len(uniprots))
+  print('TDL: %s'%(tdl if tdl else 'all'), file=sys.stderr)
+  print('rows: %d'%(i_row), file=sys.stderr)
+  print('Target count: %d'%(len(tids)), file=sys.stderr)
+  print('Protein count: %d'%(len(pids)), file=sys.stderr)
+  print('Uniprot count: %d'%(len(uniprots)), file=sys.stderr)
   return
 
 #############################################################################
-def GetTargets(dbname,dbcon,qs,qtype,fout,verbose=0):
+def GetTargets(dbcon,qs,qtype,fout,verbose=0):
   '''Write data to CSV file, and return as list of dict-rows.'''
   if not qs:
-    print >>sys.stderr, 'ERROR: no query ID.'
+    print('ERROR: no query ID.', file=sys.stderr)
     return
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   cols=[
@@ -304,17 +271,17 @@ JOIN
       wheres.append('xref.value = \'%s\''%qid)
       wheres.append('xref.protein_id = protein.id')
     else:
-      print >>sys.stderr, 'ERROR: unknown query type: %s'%qtype
+      print('ERROR: unknown query type: %s'%qtype, file=sys.stderr)
       return
     sql+=(' WHERE '+(' AND '.join(wheres)))
     if verbose>2:
-      print >>sys.stderr, 'DEBUG: "%s"'%sql
+      print('DEBUG: "%s"'%sql, file=sys.stderr)
     if verbose>1:
-      print >>sys.stderr, 'query: %s = "%s" ...'%(qtype,qid)
+      print('query: %s = "%s" ...'%(qtype,qid), file=sys.stderr)
     cur.execute(sql)
     rows=cur.fetchall()
     if not rows:
-      if verbose: print >>sys.stderr, 'Not found: %s = %s'%(qtype,qid)
+      if verbose: print('Not found: %s = %s'%(qtype,qid), file=sys.stderr)
       continue
     n_hit+=1
     tids_this=set();
@@ -328,12 +295,12 @@ JOIN
       if fout: fout.write('\n')
     tids_all |= tids_this
 
-  print >>sys.stderr, '%ss queries: %d, found: %d, not found: %d'%(qtype,len(qs),n_hit,(len(qs)-n_hit))
-  print >>sys.stderr, 'Targets found: %d'%(len(tids_all))
+  print('%ss queries: %d, found: %d, not found: %d'%(qtype,len(qs),n_hit,(len(qs)-n_hit)), file=sys.stderr)
+  print('Targets found: %d'%(len(tids_all)), file=sys.stderr)
   return list(tids_all)
 
 #############################################################################
-def GetPathways(dbname,dbcon,tids,fout,verbose):
+def GetPathways(dbcon,tids,fout,verbose):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   cols=[
 	't2p.target_id',
@@ -366,13 +333,13 @@ ORDER BY
 	}
 
     if verbose>2:
-      print >>sys.stderr, 'DEBUG: "%s"'%sql
+      print('DEBUG: "%s"'%sql, file=sys.stderr)
     if verbose>1:
-      print >>sys.stderr, 'query: %s ...'%(tid)
+      print('query: %s ...'%(tid), file=sys.stderr)
     cur.execute(sql)
     rows=cur.fetchall()
     if not rows:
-      if verbose: print >>sys.stderr, 'Not found: %s'%(str(tid))
+      if verbose: print('Not found: %s'%(str(tid)), file=sys.stderr)
       continue
     n_hit+=1
     pids_this=set();
@@ -387,192 +354,101 @@ ORDER BY
       if fout: fout.write('\n')
     pids_all |= pids_this
 
-  print >>sys.stderr, 'queries: %d, found: %d, not found: %d'%(len(tids),n_hit,(len(tids)-n_hit))
-  print >>sys.stderr, 'Pathways found: %d'%(len(pids_all))
+  print('queries: %d, found: %d, not found: %d'%(len(tids),n_hit,(len(tids)-n_hit)), file=sys.stderr)
+  print('Pathways found: %d'%(len(pids_all)), file=sys.stderr)
   return list(pids_all)
 
 #############################################################################
 if __name__=='__main__':
+  qtypes=[ 'TID', 'GENEID', 'UNIPROT', 'GENESYMB', 'NCBI_GI']
+  parser = argparse.ArgumentParser(description='TCRD MySql client utility')
+  ops = ['info', 'describe', 'counts', 'tdlCounts', 'xrefCounts', 'attrCounts', 'listTargets', 'listXreftypes', 'listXrefs', 'getTargets', 'getTargetpathways']
+  parser.add_argument("op", choices=ops, help='operation')
+  parser.add_argument("--o", dest="ofile", help="output (TSV)")
+  parser.add_argument("--query", help="query ID or symbol")
+  parser.add_argument("--qfile", help="input query file")
+  parser.add_argument("--qtype", choices=qtypes, default='TID', help='query type')
+  parser.add_argument("--id", help="query ID or symbol")
+  parser.add_argument("--tdl", help="Target Development Level (TDL) %s"%('|'.join(TDLS)))
+  parser.add_argument("--fam", help="target family GPCR|Kinase|IC|NR|...|Unknown")
+  parser.add_argument("--dbname", default=DBNAME)
+  parser.add_argument("--dbhost", default=DBHOST)
+  parser.add_argument("--dbusr")
+  parser.add_argument("--dbpw")
+  parser.add_argument("-v", "--verbose", dest="verbose", action="count", default=0)
 
-  usage='''
-  %(PROG)s - TCRD db client utility (see also REST API client)
+  args = parser.parse_args()
 
-operations:
-  --info .............. db info
-  --describe .......... describe db schema
-  --counts ............ table row counts
-  --tdl_counts ........ target development level counts
-  --xref_counts ....... synonyms, aliases and xrefs
-  --attr_counts ....... attributes
-  --list_targets ...... list targets, optionally for specified TDL
-  --get_targets ....... get targets for query name, ID
-  --get_targetpathways ... get pathways for specified targets
-  --list_xref_types ... list xref types
-  --list_xrefs ........ list xrefs for specified xref type
-
-query:
-  --query QID ......... query ID or symbol
-  --qfile QFILE ....... input query file
-  --qtype QTYPE ....... TID|GENEID|UNIPROT|GENESYMB
-
-  query types:
-    TID .............. TCRD target ID (e.g. 1, 2, 3)
-    GENEID ........... NCBI Entrez gene ID (e.g. 7529,10971)
-    UNIPROT .......... Uniprot ID (e.g. Q04917,P04439)
-    GENESYMB ......... HUGO gene symbol (e.g. GPER1, HLA-A,YWHAG)
-    NCBI_GI .......... NCBI GI numbers
-
-parameters:
-  --tdl TDL ........... TDL [0-4] %(TDL)s
-  --fam FAM ........... GPCR|Kinase|IC|NR|...|Unknown
-
-options:
-  --o OFILE ........... output file (CSV)
-  --dbname DBNAME ..... [%(DBNAME)s]
-  --dbhost DBHOST ..... [%(DBHOST)s]
-  --dbusr DBUSR ....... [%(DBUSR)s]
-  --dbpw DBPW .........
-  --v[v[v]] ........... verbose [very [very]]
-  --h ................. this help
-
-'''%{'PROG':PROG,'DBNAME':DBNAME,'DBHOST':DBHOST,'DBUSR':DBUSR,
-	'TDL':str(TDL)}
-
-  def ErrorExit(msg):
-    print >>sys.stderr,msg
-    sys.exit(1)
-
-  ofile=None;
-  qfile=None;
-  query=None;
-  verbose=0;
-  describe=False;
-  info=False;
-  counts=False;
-  tdl_counts=False;
-  xref_counts=False;
-  attr_counts=False;
-  list_targets=False;
-  list_xref_types=False;
-  list_xrefs=False;
-  get_targets=False;
-  get_targetpathways=False;
-  tdl=None;
-  fam=None;
-
-  query=None;
-  qtype='TID';
-
-  test=False;
-  opts,pargs = getopt.getopt(sys.argv[1:],'',['h','v','vv','vvv',
-	'o=',
-	'query=', 'qfile=', 'qtype=',
-	'tdl=', 'fam=',
-	'info', 'describe', 'counts', 'tdl_counts', 'xref_counts', 'attr_counts',
-	'list_targets',
-	'list_xref_types',
-	'list_xrefs',
-	'get_targets',
-	'get_targetpathways',
-	'dbname=', 'dbhost=', 'dbusr=', 'dbpw=' ])
-  if not opts: ErrorExit(usage)
-  for (opt,val) in opts:
-    if opt=='--h': ErrorExit(usage)
-    elif opt=='--o': ofile=val
-    elif opt=='--qfile': qfile=val
-    elif opt=='--query': query=val
-    elif opt=='--qtype': qtype=val
-    elif opt=='--info': info=True
-    elif opt=='--describe': describe=True
-    elif opt=='--counts': counts=True
-    elif opt=='--tdl_counts': tdl_counts=True
-    elif opt=='--xref_counts': xref_counts=True
-    elif opt=='--attr_counts': attr_counts=True
-    elif opt=='--list_targets': list_targets=True
-    elif opt=='--list_xref_types': list_xref_types=True
-    elif opt=='--list_xrefs': list_xrefs=True
-    elif opt=='--get_targets': get_targets=True
-    elif opt=='--get_targetpathways': get_targetpathways=True
-    elif opt=='--tdl': tdl=int(val)
-    elif opt=='--fam': fam=val
-    elif opt=='--dbname': DBNAME=val
-    elif opt=='--dbhost': DBHOST=val
-    elif opt=='--dbusr': DBUSR=val
-    elif opt=='--dbpw': DBPW=val
-    elif opt=='--v': verbose=1
-    elif opt=='--vv': verbose=2
-    elif opt=='--vvv': verbose=3
-    else: ErrorExit('Illegal option: %s'%val)
-
-  if ofile:
-    fout=open(ofile,"w+")
-    #fout=codecs.open(ofile,"w","utf8","replace")
-    if not fout: ErrorExit('ERROR: cannot open outfile: %s'%ofile)
+  if args.ofile:
+    fout=open(args.ofile,"w+")
+    if not fout: parser.error('ERROR: cannot open outfile: %s'%args.ofile)
   else:
     fout=sys.stdout
-    #fout=codecs.getwriter('utf8')(sys.stdout,errors="replace")
 
   qs=[]
-  if qfile:
-    fin=open(qfile)
-    if not fin: ErrorExit('ERROR: cannot open qfile: %s'%qfile)
+  if args.qfile:
+    fin=open(args.qfile)
+    if not fin: ErrorExit('ERROR: cannot open qfile: %s'%args.qfile)
     while True:
       line=fin.readline()
       if not line: break
       try:
         qs.append(line.rstrip())
       except:
-        print >>sys.stderr, 'ERROR: bad input ID: %s'%line
+        print('ERROR: bad input ID: %s'%line, file=sys.stderr)
         continue
     if verbose:
-      print >>sys.stderr, '%s: input IDs: %d'%(PROG,len(qs))
+      print('%s: input IDs: %d'%(PROG,len(qs)), file=sys.stderr)
     fin.close()
-  elif query:
-    qs.append(query)
+  elif args.query:
+    qs.append(args.query)
 
-  dbcon = Connect(dbhost=DBHOST,dbname=DBNAME,dbusr=DBUSR,dbpw=DBPW)
+  if args.dbusr and args.dbpw:
+    dbcon=mysql.connect(host=args.dbhost,user=args.dbusr,passwd=args.dbpw,db=args.dbname)
+  else:
+    dbcon=mysql.connect(host=args.dbhost,db=args.dbname)
 
-  if describe:
-    print Describe(DBNAME,dbcon)
+  if args.op=='describe':
+    print(Describe(dbcon))
 
-  elif info:
-    rdata = Info(DBNAME,dbcon)
-    print json.dumps(rdata,indent=2,sort_keys=True)
+  elif args.op=='info':
+    rdata = Info(dbcon)
+    print(json.dumps(rdata,indent=2,sort_keys=True))
 
-  elif counts:
-    print Counts(DBNAME,dbcon)
+  elif args.op=='counts':
+    print(Counts(dbcon))
 
-  elif xref_counts:
-    print XrefCounts(DBNAME,dbcon)
+  elif args.op=='xrefCounts':
+    print(XrefCounts(dbcon))
 
-  elif attr_counts:
-    print AttributeCounts(DBNAME,dbcon)
+  elif args.op=='attrCounts':
+    print(AttributeCounts(dbcon))
 
-  elif tdl_counts:
-    rdata = TDLCounts(DBNAME,dbcon)
-    print json.dumps(rdata,indent=2,sort_keys=True)
+  elif args.op=='tdlCounts':
+    rdata = TDLCounts(dbcon)
+    print(json.dumps(rdata,indent=2,sort_keys=True))
 
-  elif list_targets:
-    ListTargets(DBNAME,dbcon,tdl,fam,fout,verbose)
+  elif args.op=='listTargets':
+    ListTargets(dbcon,args.tdl,args.fam,fout,args.verbose)
 
-  elif get_targets:
-    GetTargets(DBNAME,dbcon,qs,qtype,fout,verbose)
+  elif args.op=='getTargets':
+    GetTargets(dbcon,qs,args.qtype,fout,args.verbose)
 
-  elif get_targetpathways:
-    tids = GetTargets(DBNAME,dbcon,qs,qtype,None,verbose)
-    GetPathways(DBNAME,dbcon,tids,fout,verbose)
+  elif args.op=='getTargetpathways':
+    tids = GetTargets(dbcon,qs,args.qtype,None,args.verbose)
+    GetPathways(dbcon,tids,fout,args.verbose)
 
-  elif list_xref_types:
-    xreftypes = ListXreftypes(DBNAME,dbcon,verbose)
-    print str(xreftypes)
+  elif args.op=='listXreftypes':
+    xreftypes = ListXreftypes(dbcon,args.verbose)
+    print(str(xreftypes))
 
-  elif list_xrefs:
-    xreftypes = ListXreftypes(DBNAME,dbcon,verbose)
+  elif args.op=='listXrefs':
+    xreftypes = ListXreftypes(dbcon,args.verbose)
     if qtype not in xreftypes:
       ErrorExit('ERROR: qtype "%s" invalid.  Available xref types: %s'%(qtype,str(xreftypes)))
-    ListXrefs(DBNAME,dbcon,qtype,fout,verbose)
+    ListXrefs(dbcon,args.qtype,fout,args.verbose)
 
   else:
-    ErrorExit('ERROR: No operation specified.')
+    parser.print_help()
 
   dbcon.close()
