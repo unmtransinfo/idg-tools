@@ -1,0 +1,125 @@
+---
+title: "IMPC mouse and ortholog human gene counts"
+author: "Jeremy Yang"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+base::date()
+```
+
+```{r}
+library(readr)
+library(data.table)
+```
+
+# IMPC from TCRD
+
+<pre>
+SELECT
+        pt.protein_id,
+        p.sym,
+        p.uniprot,
+        p.geneid,
+        t.name,
+        t.tdl,
+        pt.id AS "tcrd_phenotype_id",
+        pt.term_id AS "mp_term_id",
+        pt.term_name AS "mp_term_name",
+        pt.top_level_term_id AS "top_level_mp_term_id",
+        pt.top_level_term_name AS "top_level_mp_term_name",
+        pt.sex AS "mp_sex",
+        pt.p_value,
+        pt.percentage_change,
+        pt.effect_size,
+        pt.statistical_method
+FROM
+        phenotype pt
+JOIN
+        protein p ON p.id = pt.protein_id
+JOIN
+        t2tc ON t2tc.protein_id = pt.protein_id
+JOIN
+        target t ON t.id = t2tc.target_id
+WHERE
+        pt.ptype = 'IMPC'
+</pre>
+
+```{r message=FALSE}
+tcrd_geno2pheno_impc <- read_delim("/home/data/TCRD/data/tcrd_geno2pheno_impc.tsv", "\t")
+setDT(tcrd_geno2pheno_impc)
+```
+```{r echo=TRUE}
+n_tcrd <- uniqueN(tcrd_geno2pheno_impc$protein_id)
+sprintf("Human genes in TCRD IMPC g2p: %d", n_tcrd)
+```
+
+# IMPC from `metap` DB
+
+<pre>
+mouse.phen <- dbGetQuery(conn, "select * from mousephenotype")
+mouse2human <- dbGetQuery(conn, "select h.protein_id human_protein_id,m.protein_id mouse_protein_id FROM homology h INNER JOIN homology m on h.homologene_group_id = m.homologene_group_id an
+d h.tax_id = 9606 and m.tax_id = 10090")
+mouse.phen <- merge(mouse.phen, mouse2human, by.x = "protein_id", by.y = "mouse_protein_id", sort = F)
+write.table(mouse.phen, "mouse.phen.tsv", sep="\t", row.names=F)
+</pre>
+
+```{r}
+mpml_mouse_phen <- read_delim("/home/data/metap/data/mouse.phen.tsv.gz", "\t")
+setDT(mpml_mouse_phen)
+```
+
+```{r echo=TRUE}
+sprintf("Mouse genes in MPML IMPC g2p: %d", uniqueN(mpml_mouse_phen$protein_id))
+n_mpml <- uniqueN(mpml_mouse_phen$human_protein_id)
+sprintf("Human genes in MPML IMPC g2p: %d", n_mpml)
+```
+```{r echo=TRUE}
+sprintf("Human genes (TCRD) minus (MPML): (%d - %d) = %d (%.1f%%)", n_tcrd, n_mpml, n_tcrd-n_mpml, 100*(n_tcrd-n_mpml)/n_mpml)
+```
+
+# IMPC
+## release 9.2 (Jan 29, 2019)
+From ftp://ftp.ebi.ac.uk/pub/databases/impc/release-9.2/csv/ALL_genotype_phenotype.csv.gz
+(Apparently includes {IMPC, MGP and EuroPhenome}_genotype_phenotype.csv.gz)
+
+```{r message=FALSE}
+impc_g2p <- read_delim("/home/data/IMPC/data/release-9.2/ALL_genotype_phenotype.csv", ",")
+```
+
+```{r echo=TRUE}
+sprintf("Mouse genes in IMPC g2p: %d", uniqueN(impc_g2p$marker_accession_id))
+```
+
+# TCRD ortholog (mouse)
+
+<pre>
+SELECT
+        id,
+        protein_id,
+        geneid,
+        symbol AS "mgi_symbol",
+        db_id AS "mgi_id",
+        mod_url AS "mgi_url",
+        taxid,
+        species
+FROM
+        ortholog
+WHERE
+        taxid = 10090
+</pre>
+
+```{r}
+ortholog <- read_delim("/home/data/TCRD/data/tcrd_ortholog_mouse.tsv", "\t", col_types="nccccccc")
+setDT(ortholog)
+ortholog[, c("id",  "taxid", "species", "mgi_url"):=NULL]
+```
+
+```{r echo=TRUE}
+impc_g2p <- merge(impc_g2p, ortholog, by.x="marker_accession_id", by.y="mgi_id", all.x=T, all.y=F)
+sprintf("Human genes in IMPC g2p, via orthology (protein_id): %d", uniqueN(impc_g2p$protein_id))
+```
