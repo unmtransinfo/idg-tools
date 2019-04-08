@@ -123,3 +123,39 @@ ortholog[, c("id",  "taxid", "species", "mgi_url"):=NULL]
 impc_g2p <- merge(impc_g2p, ortholog, by.x="marker_accession_id", by.y="mgi_id", all.x=T, all.y=F)
 sprintf("Human genes in IMPC g2p, via orthology (protein_id): %d", uniqueN(impc_g2p$protein_id))
 ```
+
+# IMPC API
+
+<pre>
+impc_query.py --phenotyping_center JAX --o impc_gp_JAX.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center WTSI --o impc_gp_WTSI.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center CMHD --o impc_gp_CMHD.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center HMGU --o impc_gp_HMGU.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center KMPC --o impc_gp_KMPC.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "MRC Harwell" --o impc_gp_MRCHarwell.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "ICS" --o impc_gp_ICS.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "MARC" --o impc_gp_MARC.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "RBRC" --o impc_gp_RBRC.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "TCP" --o impc_gp_TCP.tsv -v  getGPAsByCenter
+impc_query.py --phenotyping_center "UC Davis" --o impc_gp_UCDavis.tsv -v  getGPAsByCenter
+</pre>
+
+```{r message=FALSE}
+centers <- c("BCM", "CMHD", "HMGU", "ICS", "JAX", "KMPC", "MARC", "MRCHarwell", "RBRC", "TCP", "UCDavis", "WTSI")
+gpdts <- list()
+for (center in centers) {
+  gpdts[[center]] <- read_delim(sprintf("data/impc_gp_%s.tsv", center), "\t")
+  setDT(gpdts[[center]])
+  sprintf("%s: rows: %d ; cols: %d", center, nrow(gpdts[[center]]), ncol(gpdts[[center]]))
+}
+gp <- rbindlist(gpdts, use.names=T, fill=T)
+rm(gpdts)
+write_delim(gp, "data/impc_gp_All.tsv", "\t")
+sprintf("Totals: phenotyping centers: %d ; genes: %d ; phenotypes: %d ; g2ps: %d", uniqueN(gp$phenotyping_center), uniqueN(gp$marker_accession_id), uniqueN(gp$mp_term_id), uniqueN(gp$doc_id))
+```
+```{r}
+gp_counts <- gp[, .(N_genes = uniqueN(marker_accession_id), N_phenotypes = uniqueN(mp_term_id), N_gp = .N), by="phenotyping_center"]
+knitr::kable(gp_counts, caption="Counts by phenotyping center")
+```
+
+
