@@ -4,12 +4,17 @@ library(readr)
 library(data.table, quietly = T)
 library(RMySQL, quietly = T)
 
-DBNAME <- "tcrd"
-DBHOST <- "juniper.health.unm.edu"
+#DBHOST <- "juniper.health.unm.edu"
+#DBNAME <- "tcrd"
+#DBUSR <- Sys.getenv("USER")
+DBHOST <- "tcrd.kmc.io"
+DBNAME <- "tcrd540"
+DBUSR <- "tcrd"
 
 args <- commandArgs(trailingOnly=TRUE)
 if (interactive()) {
-  qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
+  #qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
+  qry <- "kidney|nephro"
 } else if (length(args)>0) {
   (qry <- args[1])
 } else {
@@ -21,7 +26,7 @@ print(Sys.Date())
 writeLines(sprintf("DBHOST: %s; DBNAME: %s", DBHOST, DBNAME))
 writeLines(sprintf("QUERY: WHERE disease.name REGEXP '%s'", qry))
 
-dbcon <- dbConnect(MySQL(), host=DBHOST, dbname=DBNAME)
+dbcon <- dbConnect(MySQL(), host=DBHOST, dbname=DBNAME, user=DBUSR)
 sql <- sprintf("SELECT
 	d.did, d.name, d.dtype, d.zscore, d.evidence, d.conf,
 	d.reference, d.drug_name, d.log2foldchange, d.pvalue, d.score, d.source,
@@ -40,7 +45,7 @@ rm(dbcon)
 #
 setDT(tcrd)
 #
-dcounts <- tcrd[, .(N = .N), by = .(name = name)]
+dcounts <- tcrd[, .(.N), by = .(name = tolower(name))]
 setorder(dcounts, -N)
 writeLines(sprintf("Total unique disease terms: %d", nrow(dcounts)))
 writeLines(sprintf("%d. %d (%.1f%%) %s", 1:nrow(dcounts), dcounts$N, 100*dcounts$N/nrow(tcrd), dcounts$name))

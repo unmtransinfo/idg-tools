@@ -7,3 +7,5 @@ bipolar
 (colitis|crohn)
 (rheumat.*arthritis)
 (^depressive|depression|depressive disorder)
+(kidney|nephro|hypomagnesemia)
+(^diabetic nephropathy|^iga nephropathy|^hypertensive nephropathy|^CKD|^polycystic kidney disease|^hyponatremia|^hypernatremia|^hyperkalemia|^hypokalemia|^hypomagnesemia|^hypocalcemia|^hypercalcemia|^resistant hyppertension|^membranous kidney disesae|^fsgs|^mebranoproliferative disease|^lupus nephritis)
