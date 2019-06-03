@@ -8,4 +8,4 @@ bipolar
 (rheumat.*arthritis)
 (^depressive|depression|depressive disorder)
 (kidney|nephro|hypomagnesemia)
-(^diabetic nephropathy|^iga nephropathy|^hypertensive nephropathy|^CKD|^polycystic kidney disease|^hyponatremia|^hypernatremia|^hyperkalemia|^hypokalemia|^hypomagnesemia|^hypocalcemia|^hypercalcemia|^resistant hyppertension|^membranous kidney disesae|^fsgs|^mebranoproliferative disease|^lupus nephritis)
+(^diabetic nephropathy|^iga nephropathy|^hypertensive nephropathy|^CKD|^polycystic kidney disease|^hyponatremia|^hypernatremia|^hyperkalemia|^hypokalemia|^hypomagnesemia|^hypocalcemia|^hypercalcemia|^resistant hyppertension|^membranous kidney disesae|^fsgs|^mebranoproliferative disease|^membranoproliferative glomerulonephritis|^lupus nephritis|^nephrosclerosis|^intestinal hypomagnesemia 1|^membranous glomerulonephritis)

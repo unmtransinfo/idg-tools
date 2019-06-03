@@ -14,7 +14,7 @@ DBUSR <- "tcrd"
 args <- commandArgs(trailingOnly=TRUE)
 if (interactive()) {
   #qry <- "^Diabetes.*Type 2|^Type 2.*Diabetes"
-  qry <- "kidney|nephro"
+  qry <- "(^diabetic nephropathy|^iga nephropathy|^hypertensive nephropathy|^CKD|^polycystic kidney disease|^hyponatremia|^hypernatremia|^hyperkalemia|^hypokalemia|^hypomagnesemia|^hypocalcemia|^hypercalcemia|^resistant hyppertension|^membranous kidney disesae|^fsgs|^mebranoproliferative disease|^membranoproliferative glomerulonephritis|^lupus nephritis|^nephrosclerosis|^intestinal hypomagnesemia 1|^membranous glomerulonephritis)"
 } else if (length(args)>0) {
   (qry <- args[1])
 } else {
@@ -26,7 +26,7 @@ print(Sys.Date())
 writeLines(sprintf("DBHOST: %s; DBNAME: %s", DBHOST, DBNAME))
 writeLines(sprintf("QUERY: WHERE disease.name REGEXP '%s'", qry))
 
-dbcon <- dbConnect(MySQL(), host=DBHOST, dbname=DBNAME, user=DBUSR)
+dbcon <- dbConnect(MySQL(), host=DBHOST, dbname=DBNAME, user=DBUSR, password="")
 sql <- sprintf("SELECT
 	d.did, d.name, d.dtype, d.zscore, d.evidence, d.conf,
 	d.reference, d.drug_name, d.log2foldchange, d.pvalue, d.score, d.source,
@@ -39,13 +39,13 @@ WHERE
 	d.target_id = t.id AND t2tc.target_id = t.id AND t2tc.protein_id = p.id
 	AND d.name REGEXP '%s'", qry)
 #
-tcrd <- dbGetQuery(dbcon,sql)
+tcrd <- dbGetQuery(dbcon, sql)
 dbDisconnect(dbcon)
 rm(dbcon)
 #
 setDT(tcrd)
 #
-dcounts <- tcrd[, .(.N), by = .(name = tolower(name))]
+dcounts <- tcrd[, .(.N), by=.(name=tolower(name))]
 setorder(dcounts, -N)
 writeLines(sprintf("Total unique disease terms: %d", nrow(dcounts)))
 writeLines(sprintf("%d. %d (%.1f%%) %s", 1:nrow(dcounts), dcounts$N, 100*dcounts$N/nrow(tcrd), dcounts$name))
