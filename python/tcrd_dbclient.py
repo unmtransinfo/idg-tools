@@ -6,6 +6,7 @@
 	regarding mysql-connector-python package.
 '''
 import os,sys,argparse,re,time,types
+import logging
 import json
 import mysql.connector as mysql
 
@@ -129,7 +130,7 @@ GROUP BY tdl
   return rdata
 
 #############################################################################
-def ListXreftypes(dbcon,verbose=0):
+def ListXreftypes(dbcon, verbose=0):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   sql='SELECT DISTINCT xtype FROM xref ORDER BY xtype'
   cur.execute(sql)
@@ -140,7 +141,7 @@ def ListXreftypes(dbcon,verbose=0):
   return xreftypes
 
 #############################################################################
-def ListXrefs(dbcon,qtype,fout,verbose):
+def ListXrefs(dbcon,qtype,fout, verbose):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   fout.write('"%s","target_id","protein_id"\n'%(qtype))
   cols=['value','target_id','protein_id']
@@ -159,10 +160,10 @@ WHERE xtype = '%(QTYPE)s'
     fout.write('"%s",%s,%s\n'%(row['value'],tid,pid))
     n_xref+=1
     row=cur.fetchone()
-  print('Xrefs count: %d'%(n_xref), file=sys.stderr)
+  logging.info('Xrefs count: %d'%(n_xref))
 
 #############################################################################
-def ListTargets(dbcon,tdl,pfam,fout,verbose=0):
+def ListTargets(dbcon,tdl,pfam,fout, verbose=0):
   cur=dbcon.cursor(dictionary=True)
   sql='''
 SELECT
@@ -211,18 +212,18 @@ FROM
 #    fout.write('\n')
     fout.write('\t'.join([(str(row[tag]) if tag in row else '') for tag in colnames])+'\n')
     row=cur.fetchone()
-  print('TDL: %s'%(tdl if tdl else 'all'), file=sys.stderr)
-  print('rows: %d'%(i_row), file=sys.stderr)
-  print('Target count: %d'%(len(tids)), file=sys.stderr)
-  print('Protein count: %d'%(len(pids)), file=sys.stderr)
-  print('Uniprot count: %d'%(len(uniprots)), file=sys.stderr)
+  logging.info('TDL: %s'%(tdl if tdl else 'all'))
+  logging.info('rows: %d'%(i_row))
+  logging.info('Target count: %d'%(len(tids)))
+  logging.info('Protein count: %d'%(len(pids)))
+  logging.info('Uniprot count: %d'%(len(uniprots)))
   return
 
 #############################################################################
-def GetTargets(dbcon,qs,qtype,fout,verbose=0):
+def GetTargets(dbcon,qs,qtype,fout, verbose=0):
   '''Write data to CSV file, and return as list of dict-rows.'''
   if not qs:
-    print('ERROR: no query ID.', file=sys.stderr)
+    logging.info('ERROR: no query ID.')
     return
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   cols=[
@@ -263,25 +264,25 @@ JOIN
       wheres.append('protein.uniprot = \'%s\''%qid)
     elif qtype.lower() in ('gid','geneid'):
       wheres.append('protein.geneid = \'%s\''%qid)
-    elif qtype.lower() in ('genesymb','genesymbol'):
+    elif qtype.lower() in ('genesymb', 'genesymbol'):
       wheres.append('protein.sym = \'%s\''%qid)
+    elif qtype.lower() == 'ensp':
+      wheres.append('protein.stringid = \'%s\''%qid)
     elif qtype.lower() == 'ncbi_gi':
       sql+=('\nJOIN\n\txref ON xref.protein_id = protein.id')
       wheres.append('xref.xtype = \'NCBI GI\'')
       wheres.append('xref.value = \'%s\''%qid)
       wheres.append('xref.protein_id = protein.id')
     else:
-      print('ERROR: unknown query type: %s'%qtype, file=sys.stderr)
+      logging.info('ERROR: unknown query type: %s'%qtype)
       return
     sql+=(' WHERE '+(' AND '.join(wheres)))
-    if verbose>2:
-      print('DEBUG: "%s"'%sql, file=sys.stderr)
-    if verbose>1:
-      print('query: %s = "%s" ...'%(qtype,qid), file=sys.stderr)
+    logging.debug('"%s"'%sql)
+    logging.debug('query: %s = "%s" ...'%(qtype,qid))
     cur.execute(sql)
     rows=cur.fetchall()
     if not rows:
-      if verbose: print('Not found: %s = %s'%(qtype,qid), file=sys.stderr)
+      logging.info('Not found: %s = %s'%(qtype,qid))
       continue
     n_hit+=1
     tids_this=set();
@@ -295,12 +296,12 @@ JOIN
       if fout: fout.write('\n')
     tids_all |= tids_this
 
-  print('%ss queries: %d, found: %d, not found: %d'%(qtype,len(qs),n_hit,(len(qs)-n_hit)), file=sys.stderr)
-  print('Targets found: %d'%(len(tids_all)), file=sys.stderr)
+  logging.info('%ss queries: %d, found: %d, not found: %d'%(qtype,len(qs),n_hit,(len(qs)-n_hit)))
+  logging.info('Targets found: %d'%(len(tids_all)))
   return list(tids_all)
 
 #############################################################################
-def GetPathways(dbcon,tids,fout,verbose):
+def GetPathways(dbcon,tids,fout, verbose):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   cols=[
 	't2p.target_id',
@@ -332,14 +333,12 @@ ORDER BY
 	'TID':str(tid)
 	}
 
-    if verbose>2:
-      print('DEBUG: "%s"'%sql, file=sys.stderr)
-    if verbose>1:
-      print('query: %s ...'%(tid), file=sys.stderr)
+    logging.debug('"%s"'%sql)
+    logging.debug('query: %s ...'%(tid))
     cur.execute(sql)
     rows=cur.fetchall()
     if not rows:
-      if verbose: print('Not found: %s'%(str(tid)), file=sys.stderr)
+      logging.info('Not found: %s'%(str(tid)))
       continue
     n_hit+=1
     pids_this=set();
@@ -348,19 +347,18 @@ ORDER BY
       if row.has_key('id'): pids_this.add(row['id'])
       for j,tag in enumerate(colnames):
         val = row[tag] if row.has_key(tag) else ''
-        #if type(val) in types.StringTypes: val = val.decode('unicode-escape')
         if type(val) in types.StringTypes: val = val.encode('string-escape')
         if fout: fout.write(',"%s"'%(val))
       if fout: fout.write('\n')
     pids_all |= pids_this
 
-  print('queries: %d, found: %d, not found: %d'%(len(tids),n_hit,(len(tids)-n_hit)), file=sys.stderr)
-  print('Pathways found: %d'%(len(pids_all)), file=sys.stderr)
+  logging.info('queries: %d, found: %d, not found: %d'%(len(tids),n_hit,(len(tids)-n_hit)))
+  logging.info('Pathways found: %d'%(len(pids_all)))
   return list(pids_all)
 
 #############################################################################
 if __name__=='__main__':
-  qtypes=[ 'TID', 'GENEID', 'UNIPROT', 'GENESYMB', 'NCBI_GI']
+  qtypes=[ 'TID', 'GENEID', 'UNIPROT', 'GENESYMB', 'NCBI_GI', 'ENSP']
   parser = argparse.ArgumentParser(description='TCRD MySql client utility')
   ops = ['info', 'describe', 'counts', 'tdlCounts', 'xrefCounts', 'attrCounts', 'listTargets', 'listXreftypes', 'listXrefs', 'getTargets', 'getTargetpathways']
   parser.add_argument("op", choices=ops, help='operation')
@@ -379,6 +377,9 @@ if __name__=='__main__':
 
   args = parser.parse_args()
 
+  logging.basicConfig(format='%(levelname)s:%(message)s', level=(
+	logging.DEBUG if args.verbose>1 else logging.INFO))
+
   if args.ofile:
     fout=open(args.ofile,"w+")
     if not fout: parser.error('ERROR: cannot open outfile: %s'%args.ofile)
@@ -395,25 +396,24 @@ if __name__=='__main__':
       try:
         qs.append(line.rstrip())
       except:
-        print('ERROR: bad input ID: %s'%line, file=sys.stderr)
+        logging.error('ERROR: bad input ID: %s'%line)
         continue
-    if verbose:
-      print('%s: input IDs: %d'%(PROG,len(qs)), file=sys.stderr)
+    logging.info('%s: input IDs: %d'%(PROG,len(qs)))
     fin.close()
   elif args.query:
     qs.append(args.query)
 
   if args.dbusr and args.dbpw:
-    dbcon=mysql.connect(host=args.dbhost,user=args.dbusr,passwd=args.dbpw,db=args.dbname)
+    dbcon=mysql.connect(host=args.dbhost, user=args.dbusr, passwd=args.dbpw, db=args.dbname)
   else:
-    dbcon=mysql.connect(host=args.dbhost,db=args.dbname)
+    dbcon=mysql.connect(host=args.dbhost, db=args.dbname)
 
   if args.op=='describe':
     print(Describe(dbcon))
 
   elif args.op=='info':
     rdata = Info(dbcon)
-    print(json.dumps(rdata,indent=2,sort_keys=True))
+    print(json.dumps(rdata, indent=2, sort_keys=True))
 
   elif args.op=='counts':
     print(Counts(dbcon))
@@ -426,27 +426,27 @@ if __name__=='__main__':
 
   elif args.op=='tdlCounts':
     rdata = TDLCounts(dbcon)
-    print(json.dumps(rdata,indent=2,sort_keys=True))
+    print(json.dumps(rdata, indent=2, sort_keys=True))
 
   elif args.op=='listTargets':
-    ListTargets(dbcon,args.tdl,args.fam,fout,args.verbose)
+    ListTargets(dbcon, args.tdl, args.fam, fout, args.verbose)
 
   elif args.op=='getTargets':
-    GetTargets(dbcon,qs,args.qtype,fout,args.verbose)
+    GetTargets(dbcon, qs, args.qtype, fout, args.verbose)
 
   elif args.op=='getTargetpathways':
-    tids = GetTargets(dbcon,qs,args.qtype,None,args.verbose)
-    GetPathways(dbcon,tids,fout,args.verbose)
+    tids = GetTargets(dbcon, qs, args.qtype, None, args.verbose)
+    GetPathways(dbcon, tids, fout, args.verbose)
 
   elif args.op=='listXreftypes':
-    xreftypes = ListXreftypes(dbcon,args.verbose)
+    xreftypes = ListXreftypes(dbcon, args.verbose)
     print(str(xreftypes))
 
   elif args.op=='listXrefs':
-    xreftypes = ListXreftypes(dbcon,args.verbose)
+    xreftypes = ListXreftypes(dbcon, args.verbose)
     if qtype not in xreftypes:
-      ErrorExit('ERROR: qtype "%s" invalid.  Available xref types: %s'%(qtype,str(xreftypes)))
-    ListXrefs(dbcon,args.qtype,fout,args.verbose)
+      ErrorExit('ERROR: qtype "%s" invalid.  Available xref types: %s'%(qtype, str(xreftypes)))
+    ListXrefs(dbcon, args.qtype, fout, args.verbose)
 
   else:
     parser.print_help()
