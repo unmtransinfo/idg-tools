@@ -12,9 +12,10 @@ import mysql.connector as mysql
 
 PROG=os.path.basename(sys.argv[0])
 
-DBHOST='juniper.health.unm.edu'
+DBHOST='tcrd.kmc.io'
 DBNAME='tcrd'
-DBUSR=os.environ['USER']
+DBUSR='tcrd'
+DBPW=''
 
 TDLS=['Tdark', 'Tbio', 'Tchem', 'Tclin']
 
@@ -137,7 +138,7 @@ def ListXreftypes(dbcon, verbose=0):
   rows=cur.fetchall()
   xreftypes=[]
   for row in rows:
-    if row.has_key('xtype'): xreftypes.append(row['xtype'])
+    if 'xtype' in row: xreftypes.append(row['xtype'])
   return xreftypes
 
 #############################################################################
@@ -155,8 +156,8 @@ WHERE xtype = '%(QTYPE)s'
   row=cur.fetchone()
   n_xref=0;
   while row:
-    tid = row['target_id'] if (row.has_key('target_id') and row['target_id']!=None) else ''
-    pid = row['protein_id'] if (row.has_key('protein_id') and row['protein_id']!=None) else ''
+    tid = row['target_id'] if ('target_id' in row and row['target_id']!=None) else ''
+    pid = row['protein_id'] if ('protein_id' in row and row['protein_id']!=None) else ''
     fout.write('"%s",%s,%s\n'%(row['value'],tid,pid))
     n_xref+=1
     row=cur.fetchone()
@@ -220,12 +221,12 @@ FROM
   return
 
 #############################################################################
-def GetTargets(dbcon,qs,qtype,fout, verbose=0):
+def GetTargets(dbcon, qs, qtype, fout, verbose=0):
   '''Write data to CSV file, and return as list of dict-rows.'''
   if not qs:
     logging.info('ERROR: no query ID.')
     return
-  cur=dbcon.cursor(mysql.cursors.DictCursor)
+  cur = dbcon.cursor(dictionary=True)
   cols=[
 	'target.description',
 	'target.id',
@@ -256,13 +257,13 @@ JOIN
 	t2tc ON target.id = t2tc.target_id
 JOIN
 	protein ON protein.id = t2tc.protein_id
-'''%{'COLS':(','.join(map(lambda s: '%s AS %s'%(s,s.replace('.','_')),cols)))}
+'''%{'COLS':(','.join(map(lambda s: '%s AS %s'%(s, s.replace('.', '_')), cols)))}
     wheres=[]
     if qtype.lower()=='tid':
       wheres.append('target.id = %d'%int(qid))
     elif qtype.lower()=='uniprot':
       wheres.append('protein.uniprot = \'%s\''%qid)
-    elif qtype.lower() in ('gid','geneid'):
+    elif qtype.lower() in ('gid', 'geneid'):
       wheres.append('protein.geneid = \'%s\''%qid)
     elif qtype.lower() in ('genesymb', 'genesymbol'):
       wheres.append('protein.sym = \'%s\''%qid)
@@ -278,30 +279,30 @@ JOIN
       return
     sql+=(' WHERE '+(' AND '.join(wheres)))
     logging.debug('"%s"'%sql)
-    logging.debug('query: %s = "%s" ...'%(qtype,qid))
+    logging.debug('query: %s = "%s" ...'%(qtype, qid))
     cur.execute(sql)
     rows=cur.fetchall()
     if not rows:
-      logging.info('Not found: %s = %s'%(qtype,qid))
+      logging.info('Not found: %s = %s'%(qtype, qid))
       continue
     n_hit+=1
     tids_this=set();
-    colnames=map(lambda s: s.replace('.','_'),cols)
+    colnames=map(lambda s: s.replace('.', '_'), cols)
     for row in rows:
-      if row.has_key('target_id'): tids_this.add(row['target_id'])
-      if fout: fout.write('"%s","%s"'%(qid,qtype))
+      if 'target_id' in row: tids_this.add(row['target_id'])
+      if fout: fout.write('"%s","%s"'%(qid, qtype))
       for j,tag in enumerate(colnames):
-        val = row[tag] if row.has_key(tag) else ''
+        val = row[tag] if tag in row else ''
         if fout: fout.write(',"%s"'%(val))
       if fout: fout.write('\n')
     tids_all |= tids_this
 
-  logging.info('%ss queries: %d, found: %d, not found: %d'%(qtype,len(qs),n_hit,(len(qs)-n_hit)))
+  logging.info('%ss queries: %d, found: %d, not found: %d'%(qtype, len(qs), n_hit, (len(qs)-n_hit)))
   logging.info('Targets found: %d'%(len(tids_all)))
   return list(tids_all)
 
 #############################################################################
-def GetPathways(dbcon,tids,fout, verbose):
+def GetPathways(dbcon, tids, fout, verbose):
   cur=dbcon.cursor(mysql.cursors.DictCursor)
   cols=[
 	't2p.target_id',
@@ -344,9 +345,9 @@ ORDER BY
     pids_this=set();
     colnames=map(lambda s: s.replace('.','_'),cols)
     for row in rows:
-      if row.has_key('id'): pids_this.add(row['id'])
+      if 'id' in row: pids_this.add(row['id'])
       for j,tag in enumerate(colnames):
-        val = row[tag] if row.has_key(tag) else ''
+        val = row[tag] if tag in row else ''
         if type(val) in types.StringTypes: val = val.encode('string-escape')
         if fout: fout.write(',"%s"'%(val))
       if fout: fout.write('\n')
@@ -371,8 +372,8 @@ if __name__=='__main__':
   parser.add_argument("--fam", help="target family GPCR|Kinase|IC|NR|...|Unknown")
   parser.add_argument("--dbname", default=DBNAME)
   parser.add_argument("--dbhost", default=DBHOST)
-  parser.add_argument("--dbusr")
-  parser.add_argument("--dbpw")
+  parser.add_argument("--dbusr", default=DBUSR)
+  parser.add_argument("--dbpw", default=DBPW)
   parser.add_argument("-v", "--verbose", dest="verbose", action="count", default=0)
 
   args = parser.parse_args()
@@ -403,7 +404,7 @@ if __name__=='__main__':
   elif args.query:
     qs.append(args.query)
 
-  if args.dbusr and args.dbpw:
+  if args.dbusr is not None and args.dbpw is not None:
     dbcon=mysql.connect(host=args.dbhost, user=args.dbusr, passwd=args.dbpw, db=args.dbname)
   else:
     dbcon=mysql.connect(host=args.dbhost, db=args.dbname)
