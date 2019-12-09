@@ -1,110 +1,103 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #############################################################################
 ### Pharos  REST API client
 ###
 ### https://pharos.nih.gov/idg/api/v1/targets(589)
 #############################################################################
-#############################################################################
-### Jeremy Yang
-#############################################################################
-import sys,os,argparse,re,types
-import json,codecs,csv
-import urllib2,requests,time
+import sys,os,argparse,json,re,time,logging
 #
-import rest_utils_py2 as rest_utils
+import rest_utils
 #
 API_HOST="pharos.nih.gov"
 API_BASE_PATH="/idg/api/v1"
-API_BASE_URL='https://'+API_HOST+API_BASE_PATH
 #
 #
 #############################################################################
-def GetTargets(base_url,tids,fout,verbose):
-  n_out=0;
-  tags=[];
-  for tid in tids:
-    url=base_url+'/targets(%s)'%tid
-    rval=rest_utils.GetURL(url,parse_json=True,verbose=verbose)
+def GetTargets(base_url, ids, idtype, fout, verbose):
+  tags=[]; n_out=0;
+  for id_this in ids:
+    url=base_url+'/targets(%s)'%id_this
+    rval=rest_utils.GetURL(url, parse_json=True, verbose=verbose)
     if not rval:
-      if verbose:
-        print >>sys.stderr, 'not found: %s'%(tid)
+      logging.debug('not found: %s'%(id_this))
       continue
     tgt = rval
     if not tags:
       for tag in tgt.keys():
-        if not tag.startswith('_') and (type(tgt[tag]) not in (types.ListType, types.DictType)):
+        if not tag.startswith('_') and (type(tgt[tag]) not in (list, dict)):
           tags.append(tag)
       fout.write('\t'.join(tags)+'\n')
-
-    vals = [];
+    vals=[];
     for tag in tags:
-      val=(tgt[tag] if tgt.has_key(tag) else '')
+      val=(tgt[tag] if tag in tgt else '')
       vals.append('' if val is None else str(val))
     fout.write('\t'.join(vals)+'\n')
     n_out+=1
-
-  print >>sys.stderr, 'n_in = %d'%(len(tids))
-  print >>sys.stderr, 'n_out = %d'%(n_out)
+  logging.info('n_in: %d; n_out: %d'%(len(ids), n_out))
 
 #############################################################################
-def ListItems(mode,base_url,fout,verbose):
+def ListItems(mode, base_url, fout, verbose):
   n_out=0; tags=[]; top=100; skip=0;
   while True:
-    url=base_url+'/%s?top=%d&skip=%d'%(mode,top,skip)
-    rval=rest_utils.GetURL(url,parse_json=True,verbose=verbose)
+    url=base_url+'/%s?top=%d&skip=%d'%(mode, top, skip)
+    rval=rest_utils.GetURL(url, parse_json=True, verbose=verbose)
     if not rval:
       break
-    elif type(rval) != types.DictType:
-      print >>sys.stderr, 'ERROR: rval="%s"'%(str(rval))
+    elif type(rval) is not dict:
+      logging.info('ERROR: rval="%s"'%(str(rval)))
       break
-    if verbose>2:
-      print >>sys.stderr, json.dumps(rval, indent=2)
-    count = rval['count'] if rval.has_key('count') else None
-    total = rval['total'] if rval.has_key('total') else None
-    uri = rval['uri'] if rval.has_key('uri') else None
-    print >>sys.stderr, 'DEBUG: uri="%s"'%(uri)
+    logging.debug(json.dumps(rval, indent=2))
+    count = rval['count'] if 'count' in rval else None
+    total = rval['total'] if 'total' in rval else None
+    uri = rval['uri'] if 'uri' in rval else None
+    logging.debug('uri="%s"'%(uri))
     items = rval['content']
     if not items: break
     for item in items:
       if not tags:
         for tag in item.keys():
-          if not tag.startswith('_') and (type(item[tag]) not in (types.ListType, types.DictType)):
+          if not tag.startswith('_') and (type(item[tag]) not in (list, dict)):
             tags.append(tag)
         fout.write('\t'.join(tags)+'\n')
       vals=[];
       for tag in tags:
-        val=(item[tag] if item.has_key(tag) else '')
+        val=(item[tag] if tag in item else '')
         vals.append('' if val is None else str(val))
       fout.write('\t'.join(vals)+'\n')
       n_out+=1
     skip+=top
-  print >>sys.stderr, 'n_out = %d'%(n_out)
+  logging.info('n_out = %d'%(n_out))
 
 #############################################################################
 if __name__=='__main__':
   PROG=os.path.basename(sys.argv[0])
 
-  parser = argparse.ArgumentParser(
-	description='Pharos REST API client utility',
-	epilog='BASE_URL: %s'%API_BASE_URL)
+  parser = argparse.ArgumentParser(description='Pharos REST API client utility')
+  idtypes = ['IDG_TARGET_ID', 'UNIPROT', 'ENSP', 'GSYMB']
   ops = ['listTargets', 'getTargets', 'listDiseases', 'getDiseases', 'searchDiseases']
-  parser.add_argument("op",choices=ops,help='operation')
-  parser.add_argument("--id",dest="id",help="ID, target (any type)")
-  parser.add_argument("--ids",dest="ids",help="IDs, target, comma-separated")
-  parser.add_argument("--i",dest="ifile",help="input file, PubMed IDs")
-  parser.add_argument("--nmax",help="list: max to return")
-  parser.add_argument("--o",dest="ofile",help="output (TSV)")
-  parser.add_argument("-v","--verbose",action="count")
+  parser.add_argument("op", choices=ops, help='operation')
+  parser.add_argument("--i", dest="ifile", help="input file, target IDs")
+  parser.add_argument("--id", dest="id", help="ID, target")
+  parser.add_argument("--ids", dest="ids", help="IDs, target, comma-separated")
+  parser.add_argument("--o", dest="ofile", help="output (TSV)")
+  parser.add_argument("--idtype", default='IDG_TARGET_ID', help="target ID type")
+  parser.add_argument("--nmax", type=int, help="max to return")
+  parser.add_argument("--api_host", default=API_HOST)
+  parser.add_argument("--api_base_path", default=API_BASE_PATH)
+  parser.add_argument("-v", "--verbose", default=0, action="count")
 
   args = parser.parse_args()
 
+  logging.basicConfig(format='%(levelname)s:%(message)s', level=(
+	logging.DEBUG if args.verbose>1 else logging.INFO))
+
+  BASE_URL='https://'+args.api_host+args.api_base_path
+
   if args.ofile:
-    #fout=open(args.ofile,"w+")
-    fout=codecs.open(args.ofile,"w","utf8","replace")
-    if not fout: ErrorExit('ERROR: cannot open outfile: %s'%args.ofile)
+    fout=open(args.ofile,"w+")
+    if not fout: parser.error('ERROR: cannot open outfile: %s'%args.ofile)
   else:
-    #fout=sys.stdout
-    fout=codecs.getwriter('utf8')(sys.stdout,errors="replace")
+    fout=sys.stdout
 
   ids=[];
   if args.ifile:
@@ -117,7 +110,7 @@ if __name__=='__main__':
       if not line: break
       ids.append(line.rstrip())
     if args.verbose:
-      print >>sys.stderr, 'input IDs: %d'%(len(ids))
+      logging.info('input IDs: %d'%(len(ids)))
     fin.close()
   elif args.ids:
     ids = re.split(r'\s*,\s*',args.ids.strip())
@@ -130,21 +123,21 @@ if __name__=='__main__':
     if not ids:
       parser.error('get requires TID[s].')
       parser.exit()
-    GetTargets(API_BASE_URL, ids, fout, args.verbose)
+    GetTargets(BASE_URL, ids, args.idtype, fout, args.verbose)
 
   elif args.op=='listTargets':
-    ListItems('targets', API_BASE_URL, fout, args.verbose)
+    ListItems('targets', BASE_URL, fout, args.verbose)
 
   elif args.op=='listDiseases':
-    ListItems('diseases', API_BASE_URL, fout, args.verbose)
+    ListItems('diseases', BASE_URL, fout, args.verbose)
 
   elif args.op=='getDiseases':
-    print >>sys.stderr, 'ERROR: not implemented yet.'
+    logging.info('ERROR: not implemented yet.')
 
   elif args.op=='searchDiseases':
-    print >>sys.stderr, 'ERROR: not implemented yet.'
+    logging.info('ERROR: not implemented yet.')
 
   else:
     parser.print_help()
 
-  print >>sys.stderr, ('%s: elapsed time: %s'%(PROG,time.strftime('%Hh:%Mm:%Ss',time.gmtime(time.time()-t0))))
+  logging.info(('%s: elapsed time: %s'%(PROG,time.strftime('%Hh:%Mm:%Ss',time.gmtime(time.time()-t0)))))
