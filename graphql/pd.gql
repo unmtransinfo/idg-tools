@@ -1,0 +1,51 @@
+# https://ncats-ifx.appspot.com/graphql
+{
+  search(term: "+Parkinson's +disease") {
+    targetResult {
+      count
+      facets {
+        facet
+        values {
+          name
+          value
+        }
+      }
+      targets {
+        sym
+        tdl
+        name
+        description
+        novelty
+        diseases {
+          name
+          associations{
+            did
+            type
+          }
+        }
+      }
+    }
+    diseaseResult {
+      count
+      diseases {
+        name
+        associations {
+          disassid
+          did
+          type
+          score
+          zscore
+          pvalue
+        }
+      }
+    }
+    pubResult {
+      count
+      pubs {
+        pmid
+        title
+        abstract
+      }
+    }
+  }
+}
