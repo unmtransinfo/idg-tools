@@ -1,0 +1,23 @@
+{
+  search(term: "gout") {
+    diseaseResult {
+      count
+      facets {
+        facet
+        values {
+          name
+          value
+        }
+      }
+      diseases {
+        name
+        associationCount
+        associations {
+          did
+          name
+          type
+        }
+      }
+    }
+  }
+}
