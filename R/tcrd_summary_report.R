@@ -2,9 +2,6 @@
 ### tcrd_summary_report.R
 ###
 ### Current summary statistics and figures based on MySql db querys.
-###
-### Jeremy Yang
-### 23 Apr 2015
 #################################################################################################
 library(DBI)
 library(RMySQL)
@@ -27,7 +24,7 @@ if (!Sys.info()[["nodename"]] == "lengua") #Prefer to test domainname=="health.u
 }
 
 #Data via MySql, dataframe via dbGetQuery():
-con <- dbConnect(MySQL(), user="jjyang", password="assword", dbname="tcrd", host="juniper.health.unm.edu")
+con <- dbConnect(MySQL(), dbname="tcrd", host="juniper.health.unm.edu")
 #summary(con,verbose=FALSE)
 sql <- sprintf(
 "SELECT

@@ -10,7 +10,6 @@ set -e
 #
 DBHOST="juniper.health.unm.edu"
 DBNAME="tcrd"
-DBUSR="jjyang"
 #
 #Is there a better way to list tables?
 TABLES=`mysqlshow -h $DBHOST -u $DBUSR ${DBNAME} \

@@ -2,15 +2,12 @@
 #############################################################################
 ### Dump attributes, to gene and attr_count table.
 ###
-### Jeremy Yang
-###  14 Aug 2015
 #############################################################################
 #
 set -e
 #
 DBHOST="juniper.health.unm.edu"
 DBNAME="tcrd"
-DBUSR="jjyang"
 #
 ###
 # ChEA

@@ -2,9 +2,6 @@
 ### sinai_matrix.R
 ###
 ### gene-gene association matrix, heatmap, NR human genes only, 'TF ChEA' dataset.
-###
-### Jeremy Yang
-### 28 Apr 2015
 #################################################################################################
 library(DBI)
 library(RMySQL)

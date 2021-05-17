@@ -2,16 +2,12 @@
 #############################################################################
 ### Go_tcrd_SubsetTargets.sh
 ### 
-### Jeremy Yang
-###  3 Nov 2014
 #############################################################################
 #
 set -e
 #
 DBHOST="juniper.health.unm.edu"
 DBNAME="tcrdev"
-DBUSER="jjyang"
-DBPW="assword"
 #
 TDLS="Tdark Tgray Tmacro Tchem Tclin"
 #
