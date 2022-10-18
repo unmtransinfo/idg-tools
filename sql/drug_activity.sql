@@ -4,7 +4,7 @@
 SELECT
 	t.id,
 	p.sym,
-	t.idgfam,
+	t.fam,
 	t.tdl,
 	da.drug AS "name",
 	da.has_moa,
