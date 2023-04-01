@@ -12,8 +12,8 @@ FROM
 	protein p
 LEFT JOIN
 	gene_attribute ga ON p.id = ga.protein_id
-WHERE
-	ga.type = 'IP NURSA'
+--WHERE
+--	ga.type = 'IP NURSA'
 GROUP BY
 	p.sym
 ORDER BY
