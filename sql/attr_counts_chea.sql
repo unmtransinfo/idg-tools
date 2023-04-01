@@ -7,8 +7,8 @@ FROM
 	protein p
 LEFT JOIN
 	gene_attribute ga ON p.id = ga.protein_id
-WHERE
-	ga.type = 'TF ChEA'
+--WHERE
+--	ga.type = 'TF ChEA'
 GROUP BY
 	p.sym
 ORDER BY
