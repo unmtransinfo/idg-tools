@@ -4,7 +4,7 @@ SELECT
 	p.sym,
 	p.uniprot,
 	cdf.attr_cdf,
-	t.idgfam,
+	t.fam,
 	t.tdl
 FROM
 	protein p,
@@ -18,9 +18,9 @@ WHERE
 	AND gat.name = 'Reactome Pathways'
 	AND t2tc.target_id = t.id
 	AND t2tc.protein_id = p.id
-	AND t.idgfam IS NOT NULL
+	AND t.fam IS NOT NULL
 ORDER BY
-	t.idgfam,
+	t.fam,
 	t.tdl,
 	p.sym
 	;
