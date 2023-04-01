@@ -14,8 +14,8 @@ JOIN
 	t2tc ON p.id = t2tc.protein_id
 JOIN
 	target t ON t.id = t2tc.target_id
-JOIN
-	target2pathway t2p ON t.id = t2p.target_id
+--JOIN
+--	target2pathway t2p ON t.id = t2p.target_id
 GROUP BY
 	p.sym
 ORDER BY
