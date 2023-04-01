@@ -4,9 +4,9 @@ SELECT
 	i.score "importance",
 	n.score "novelty",
 	d.doid,
-	d.name "disease",
-	d.num_important_targets,
-	d.novelty_score
+	d.name "disease"
+--	d.num_important_targets,
+--	d.novelty_score
 FROM
 	protein p,
 	tinx_importance i,
@@ -15,7 +15,7 @@ FROM
 WHERE
 	p.id = i.protein_id
 	AND i.protein_id = n.protein_id
-	AND d.id = i.disease_id
+	AND d.doid = i.doid
 ORDER BY
 	p.id
 ;
