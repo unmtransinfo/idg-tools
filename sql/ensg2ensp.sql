@@ -2,7 +2,7 @@ SELECT DISTINCT
 	protein.stringid AS "ensemblProteinId",
 	xref.value AS "ensemblGeneId"
 FROM
-	target
+	protein
 JOIN
 	xref ON xref.protein_id = protein.id
 WHERE
