@@ -22,11 +22,11 @@ WHERE
 	p1.id = ga.protein_id
 	AND p1.id = tc1.protein_id
 	AND t1.id = tc1.target_id
-	AND t1.idgfam = 'NR'
+	AND t1.fam = 'NR'
 	AND p2.id = tc2.protein_id
 	AND t2.id = tc2.target_id
-	AND t2.idgfam = 'NR'
-	AND ga.type = 'TF ChEA'
+	AND t2.fam = 'NR'
+--	AND ga.type = 'TF ChEA'
 	AND ga.name LIKE '%HUMAN%'
 	AND ga.name LIKE CONCAT(p2.sym, '-%')
 ORDER BY
