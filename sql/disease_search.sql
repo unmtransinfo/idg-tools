@@ -14,7 +14,7 @@ FROM
 	t2tc,
 	disease d
 WHERE
-	d.target_id = t.id
+	d.protein_id = p.id 
 	AND t2tc.target_id = t.id
 	AND t2tc.protein_id = p.id
 	AND d.zscore IS NOT NULL
