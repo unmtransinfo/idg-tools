@@ -1,42 +1,42 @@
 --
-SELECT
-	name,
-	data_type,
-	description
-FROM
-	expression_type
-ORDER BY
-	name
-	;
+--SELECT
+--	name,
+--	data_type,
+--	description
+--FROM
+--	expression_type
+--ORDER BY
+--	name
+--	;
 --
 SELECT
-	etype,
-	string_value,
-	COUNT(string_value)
-FROM
-	expression
-WHERE
-	string_value IS NOT NULL
-GROUP BY
 	etype
-ORDER BY
-	etype,
-	string_value
-	;
+--	string_value,
+--	COUNT(string_value)
+FROM
+	expression;
+--WHERE
+--	string_value IS NOT NULL
+--GROUP BY
+--	etype
+--ORDER BY
+--	etype
+--	string_value
+--	;
 --
-SELECT
-	etype,
-	boolean_value,
-	COUNT(boolean_value)
-FROM
-	expression
-WHERE
-	boolean_value IS NOT NULL
-GROUP BY
-	etype
-ORDER BY
-	etype,
-	boolean_value
+--SELECT
+--	etype
+--	boolean_value,
+--	COUNT(boolean_value)
+--FROM
+--	expression
+--WHERE
+--	boolean_value IS NOT NULL
+--GROUP BY
+--	etype
+--ORDER BY
+--	etype
+--	boolean_value
 	;
 --
 SELECT
