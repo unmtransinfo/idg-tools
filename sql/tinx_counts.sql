@@ -29,7 +29,7 @@ JOIN
 JOIN
 	tinx_novelty n ON n.protein_id = p.id
 JOIN
-	tinx_disease d ON d.id = i.disease_id
+	tinx_disease d ON d.doid = i.doid
 WHERE
 	i.score IS NOT NULL
 	AND n.score IS NOT NULL
