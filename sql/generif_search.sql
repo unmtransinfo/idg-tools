@@ -1,9 +1,9 @@
 SELECT
 	id,
 	protein_id,
-	pubmed_ids,
-	text,
-	years
+--	pubmed_ids,
+	text
+--	years
 FROM
 	generif
 WHERE
