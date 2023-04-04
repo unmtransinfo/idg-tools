@@ -6,7 +6,7 @@ SELECT
 	d.source,
 	p.name AS "protein_name",
 	p.description AS "protein_description",
-	t.idgfam,
+	t.fam,
 	t.tdl
 FROM
 	drug_activity d,
