@@ -10,7 +10,7 @@ SELECT
 	p.id AS "protein_id",
 	p.name AS "protein_name",
 	p.description AS "protein_description",
-	t.idgfam,
+	t.fam,
 	t.tdl
 FROM
 	phenotype pt,
