@@ -2,8 +2,8 @@
 SELECT COUNT(DISTINCT ogd.id) AS "ortholog_disease_count_total" FROM ortholog_disease ogd ;
 SELECT COUNT(DISTINCT ogd.did) AS "disease_count" FROM ortholog_disease ogd ;
 SELECT COUNT(DISTINCT ogd.ortholog_id) AS "ortholog_count" FROM ortholog_disease ogd ;
-SELECT COUNT(DISTINCT ogd.target_id) AS "target_count" FROM ortholog_disease ogd ;
---- 
+SELECT COUNT(DISTINCT ogd.protein_id) AS "target_count" FROM ortholog_disease ogd ;
+
 SELECT
 	COUNT(DISTINCT ogd.id) AS "ortholog_disease_count",
 	og.species AS "species"
