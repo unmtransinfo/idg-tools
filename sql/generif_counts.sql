@@ -4,13 +4,13 @@ SELECT COUNT(DISTINCT id) AS "generif_count_huge" FROM generif WHERE text LIKE '
 --
 SELECT COUNT(DISTINCT protein_id) AS "generif_protein_count" FROM generif ;
 --
-SELECT 
-	COUNT(DISTINCT pubmed_ids) AS "generif_pmid_count"
-FROM
-	generif
-WHERE
-	pubmed_ids NOT LIKE '%|%'
-	;
+--SELECT 
+--	COUNT(DISTINCT pubmed_ids) AS "generif_pmid_count"
+--FROM
+--	generif
+--WHERE
+--	pubmed_ids NOT LIKE '%|%'
+--	;
 --
 SELECT
 	g.protein_id,
