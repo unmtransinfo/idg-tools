@@ -6,7 +6,7 @@ SELECT
 	t.description,
 	t.comment,
 	t.tdl,
-	t.idg2,
+	t.idg,
 	t.fam,
 	t.famext,
         p.id AS "pid",
@@ -22,6 +22,6 @@ WHERE
 	AND t2tc.protein_id = p.id
         AND p.geneid IS NOT NULL
         AND p.sym IS NOT NULL
-	AND t.idg2 > 0
+	AND t.idg > 0
 	;
 --
